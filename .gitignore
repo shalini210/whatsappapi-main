@@ -1,0 +1,34 @@
+# Node modules
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment variables
+.env
+
+# Logs
+logs
+*.log
+*.log.*
+pids
+*.pid
+*.seed
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Build & cache
+dist/
+build/
+.cache/
+coverage/
+
+# VS Code & IDE settings
+.vscode/
+.idea/
+
+# Temporary uploads
+public/uploads/
+tmp/

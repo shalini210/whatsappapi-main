@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>WhatsApp Bulk Sender</title>
+  <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+  <h2>📩 WhatsApp Bulk Sender</h2>
+  <form action="/send" method="POST" enctype="multipart/form-data" target="hiddenFrame">
+    <label>Enter Numbers (comma separated):</label><br>
+    <textarea name="numbers" rows="3" cols="40"></textarea><br><br>
+
+    <label>Or Upload Excel (with column "PhoneNumber"):</label><br>
+    <input type="file" name="excel"><br><br>
+
+    <label>Message:</label><br>
+    <textarea name="message" rows="3" cols="40"></textarea><br><br>
+
+    <label>Upload Media (optional):</label><br>
+    <input type="file" name="media"><br><br>
+
+    <label>Delay between messages (ms):</label><br>
+    <input type="number" name="delay" value="2000"><br><br>
+
+    <button type="submit">Send Messages</button>
+  </form>
+
+  <h3>Status:</h3>
+  <pre id="statusBox"></pre>
+
+  <!-- Hidden iframe to avoid page reload -->
+  <iframe name="hiddenFrame" style="display:none;"></iframe>
+
+  <script>
+    const socket = io();
+    const statusBox = document.getElementById("statusBox");
+
+    socket.on("status", (msg) => {
+      statusBox.textContent += msg + "\n";
+      statusBox.scrollTop = statusBox.scrollHeight;
+    });
+  </script>
+</body>
+</html>

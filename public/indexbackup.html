@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WhatsApp Bulk Sender</title>
+          <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
+</head>
+<body style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px;">
+  <h2>📲 WhatsApp Bulk Message Sender</h2>
+
+  <!-- QR Code Section -->
+  <div id="qrBox" style="margin: 10px 0; text-align:center;">
+    <p>🔑 Scan QR to connect WhatsApp:</p>
+    <img id="qrImage" style="width:250px; border: 1px solid #ccc; display:block; margin:auto;">
+  </div>
+
+  <div id="readyBox" style="display:none; color:green; font-weight:bold; text-align:center;">
+    ✅ WhatsApp Client Connected!
+  </div>
+
+  <form id="sendForm" enctype="multipart/form-data" style="margin-top: 20px;">
+    <label>Enter Numbers (comma separated):</label><br />
+    <textarea name="numbers" rows="3" style="width:100%;"></textarea><br /><br />
+
+    <label>Upload Excel (with PhoneNumber column):</label><br />
+    <input type="file" name="excel" /><br /><br />
+
+    <label>Message:</label><br />
+    <textarea name="message" rows="4" style="width:100%;"></textarea><br /><br />
+
+    <label>Upload Media (Optional):</label><br />
+    <input type="file" name="media" /><br /><br />
+
+    <label>Delay between messages (ms):</label><br />
+    <input type="number" name="delay" value="2000" /><br /><br />
+
+    <button type="submit">🚀 Send</button>
+  </form>
+
+  <h3>Status:</h3>
+  <div id="statusBox" style="border: 1px solid #ccc; padding: 10px; min-height: 50px;"></div>
+
+  <script>
+    const socket = io();
+    const qrBox = document.getElementById("qrBox");
+    const qrImage = document.getElementById("qrImage");
+    const readyBox = document.getElementById("readyBox");
+    const statusBox = document.getElementById("statusBox");
+    const form = document.getElementById("sendForm");
+
+    socket.on("qr", (qrUrl) => {
+      qrImage.src = qrUrl;
+      qrBox.style.display = "block";
+      readyBox.style.display = "none";
+    });
+
+    socket.on("ready", () => {
+      qrBox.style.display = "none";
+      readyBox.style.display = "block";
+    });
+
+    socket.on("status", (msg) => {
+      const p = document.createElement("p");
+      p.textContent = msg;
+      statusBox.appendChild(p);
+      statusBox.scrollTop = statusBox.scrollHeight;
+    });
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const formData = new FormData(form);
+
+      const response = await fetch("/send", {
+        method: "POST",
+        body: formData,
+      });
+
+      const result = await response.text();
+      alert(result);
+    });
+  </script>
+</body>
+</html>

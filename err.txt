@@ -1,0 +1,12 @@
+
+ProtocolError: Protocol error (Runtime.callFunctionOn): Target closed.
+    at D:\whatsappapi-main\whatsappapi-main\whatsappapi-main\node_modules\whatsapp-web.js\node_modules\puppeteer-core\lib\cjs\puppeteer\common\Connection.js:329:24
+    at new Promise (<anonymous>)
+    at CDPSessionImpl.send (D:\whatsappapi-main\whatsappapi-main\whatsappapi-main\node_modules\whatsapp-web.js\node_modules\puppeteer-core\lib\cjs\puppeteer\common\Connection.js:325:16)
+    at ExecutionContext._ExecutionContext_evaluate (D:\whatsappapi-main\whatsappapi-main\whatsappapi-main\node_modules\whatsapp-web.js\node_modules\puppeteer-core\lib\cjs\puppeteer\common\ExecutionContext.js:211:46)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async ExecutionContext.evaluate (D:\whatsappapi-main\whatsappapi-main\whatsappapi-main\node_modules\whatsapp-web.js\node_modules\puppeteer-core\lib\cjs\puppeteer\common\ExecutionContext.js:107:16)
+    at async Client.sendMessage (D:\whatsappapi-main\whatsappapi-main\whatsappapi-main\node_modules\whatsapp-web.js\src\Client.js:1038:25)
+    at async D:\whatsappapi-main\whatsappapi-main\whatsappapi-main\index.js:117:13 {
+  originalMessage: ''
+}
