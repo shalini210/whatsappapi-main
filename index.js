@@ -7,6 +7,7 @@ const XLSX = require("xlsx");
 const http = require("http");
 const { Server } = require("socket.io");
 const fs = require("fs");
+const { executablePath } = require("puppeteer");
 const path = require("path");
 
 const PORT = 3000;
@@ -30,11 +31,15 @@ const client = new Client({
   puppeteer: {
     headless: true,
     args: ["--no-sandbox", "--disable-setuid-sandbox"],
-            executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe',
+      executablePath: executablePath(),
+            // executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe',
 
   },
   webVersionCache: { type: "none" },
 });
+
+  
+  
 
 // ✅ Emit QR code to frontend
 client.on("qr", async (qr) => {
