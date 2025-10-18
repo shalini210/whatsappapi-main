@@ -32,13 +32,13 @@ async function startWhatsApp() {
   const isWindows = os.platform() === "win32";
   const executablePath = isWindows
     ? "C:/Program Files/Google/Chrome/Application/chrome.exe"
-    : await chromium.executablePath;
+    : await chromium.executablePath();
 
   const client = new Client({
     puppeteer: {
       headless: true,
       args: chromium.args,
-      executablePath,
+       executablePath,
     },
     webVersionCache: { type: "none" },
   });
