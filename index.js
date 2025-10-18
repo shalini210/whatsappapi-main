@@ -20,55 +20,77 @@ const io = new Server(server, { cors: { origin: "*" } });
 
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
-app.use(fileUpload({ limits: { fileSize: 25 * 1024 * 1024 } })); // limit 25MB
-app.use(express.static("public")); // ✅ serves index.html and static files
+app.use(fileUpload({ limits: { fileSize: 25 * 1024 * 1024 } })); // 25MB limit
+app.use(express.static("public")); // serve index.html & static files
 
 // ✅ Create uploads folder if not exists
 const uploadsDir = path.join(__dirname, "uploads");
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir);
 
-// ✅ Function to create WhatsApp client
+// ✅ Session file for WhatsApp (persist login)
+const SESSION_FILE_PATH = path.join(__dirname, "session.json");
+let sessionData = fs.existsSync(SESSION_FILE_PATH)
+  ? require(SESSION_FILE_PATH)
+  : null;
+
+// ✅ Helper: sleep/delay
+const delay = (ms) => new Promise((res) => setTimeout(res, ms));
+
+// ✅ Start WhatsApp client
 async function startWhatsApp() {
   const isWindows = os.platform() === "win32";
   const executablePath = isWindows
     ? "C:/Program Files/Google/Chrome/Application/chrome.exe"
-    : await chromium.executablePath();
+    : await chromium.executablePath(); // call the function!
 
   const client = new Client({
     puppeteer: {
       headless: true,
-      args: chromium.args,
-       executablePath,
+      executablePath,
+      args: [
+        ...chromium.args,
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+      ],
+      defaultViewport: chromium.defaultViewport,
     },
+    session: sessionData, // persistent session
     webVersionCache: { type: "none" },
   });
 
-  // ✅ QR Code event
+  // ✅ Emit QR code to frontend
   client.on("qr", async (qr) => {
-    console.log("📲 Scan this QR with your WhatsApp.");
+    console.log("📲 Scan this QR code");
     const qrImageUrl = await qrcode.toDataURL(qr);
-    io.emit("qr", qrImageUrl); // ✅ frontend will receive this
+    io.emit("qr", qrImageUrl);
   });
 
-  // ✅ Ready event
+  // ✅ Save session after authentication
+  client.on("authenticated", (session) => {
+    console.log("🔒 WhatsApp authenticated!");
+    fs.writeFileSync(SESSION_FILE_PATH, JSON.stringify(session));
+  });
+
+  // ✅ Ready
   client.on("ready", () => {
-    console.log("✅ WhatsApp client is ready!");
+    console.log("✅ WhatsApp client ready!");
     io.emit("ready", true);
   });
 
-  // ✅ Reconnect if disconnected
-  client.on("disconnected", (reason) => {
-    console.log("❌ WhatsApp disconnected:", reason);
-    setTimeout(() => {
-      console.log("🔄 Reinitializing WhatsApp client...");
-      client.initialize();
-    }, 5000);
+  // ✅ Auth failure
+  client.on("auth_failure", (msg) => {
+    console.log("❌ Auth failure:", msg);
+    if (fs.existsSync(SESSION_FILE_PATH)) fs.unlinkSync(SESSION_FILE_PATH);
   });
 
-  // ✅ Helper delay
-  const delay = (ms) => new Promise((res) => setTimeout(res, ms));
+  // ✅ Disconnected → reconnect
+  client.on("disconnected", (reason) => {
+    console.log("❌ WhatsApp disconnected:", reason);
+    setTimeout(() => client.initialize(), 5000);
+  });
 
-  // ✅ Message sending endpoint
+  // ✅ Send messages API
   app.post("/send", async (req, res) => {
     try {
       if (!client.info || !client.info.wid) {
@@ -82,7 +104,7 @@ async function startWhatsApp() {
         numbers = req.body.numbers.split(",").map((n) => n.trim());
       }
 
-      // Numbers from Excel file
+      // Numbers from Excel
       if (req.files?.excel) {
         const workbook = XLSX.read(req.files.excel.data, { type: "buffer" });
         const sheetName = workbook.SheetNames[0];
@@ -93,7 +115,7 @@ async function startWhatsApp() {
         numbers = numbers.concat(excelNumbers);
       }
 
-      // ✅ Normalize numbers
+      // ✅ Normalize numbers (+91 etc)
       numbers = [...new Set(
         numbers
           .map((n) => n.replace(/\D/g, ""))
@@ -105,18 +127,14 @@ async function startWhatsApp() {
         return res.status(400).json({ error: "No valid numbers found." });
       }
 
-      // ✅ Compose message
       const message = req.body.message || "";
       const mediaFile = req.files?.media || null;
-
       if (!message.trim() && !mediaFile) {
         return res.status(400).json({ error: "Message or media is required." });
       }
 
       const msgDelay = Math.max(parseInt(req.body.delay) || 2000, 1500);
-      let sentCount = 0,
-        skippedCount = 0,
-        failedCount = 0;
+      let sentCount = 0, skippedCount = 0, failedCount = 0;
 
       (async () => {
         const total = numbers.length;
@@ -132,12 +150,9 @@ async function startWhatsApp() {
               continue;
             }
 
-            // ✅ Handle media
+            // ✅ Media
             if (mediaFile) {
-              if (
-                !mediaFile.mimetype.startsWith("video/") &&
-                !mediaFile.mimetype.startsWith("image/")
-              ) {
+              if (!mediaFile.mimetype.startsWith("video/") && !mediaFile.mimetype.startsWith("image/")) {
                 io.emit("status", `⚠️ Skipped ${number} (invalid file type)`);
                 skippedCount++;
                 continue;
@@ -153,9 +168,8 @@ async function startWhatsApp() {
               await mediaFile.mv(uploadPath);
               const base64 = fs.readFileSync(uploadPath, { encoding: "base64" });
               const media = new MessageMedia(mediaFile.mimetype, base64, mediaFile.name);
-
               await client.sendMessage(chatId, media, { caption: message });
-              fs.unlinkSync(uploadPath); // cleanup
+              fs.unlinkSync(uploadPath);
             } else {
               await client.sendMessage(chatId, message);
             }
@@ -188,7 +202,7 @@ async function startWhatsApp() {
   client.initialize();
 }
 
-// Start the WhatsApp client and the server
+// ✅ Start WhatsApp client and server
 startWhatsApp().then(() => {
   server.listen(PORT, () => {
     console.log(`🚀 Server running at http://localhost:${PORT}`);
