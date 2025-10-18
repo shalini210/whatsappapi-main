@@ -27,6 +27,9 @@ const uploadsDir = path.join(__dirname, "uploads");
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir);
 const isWindows = os.platform() === "win32";
 // ✅ Initialize WhatsApp client
+const browser = await puppeteer.launch({
+  enableExtensions: true,
+});
 const client = new Client({
   puppeteer: {
     headless: true,
