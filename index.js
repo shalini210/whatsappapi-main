@@ -25,13 +25,15 @@ app.use(express.static("public"));
 // ✅ Create uploads folder if not exists
 const uploadsDir = path.join(__dirname, "uploads");
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir);
-
+const isWindows = os.platform() === "win32";
 // ✅ Initialize WhatsApp client
 const client = new Client({
   puppeteer: {
     headless: true,
     args: ["--no-sandbox", "--disable-setuid-sandbox"],
-      executablePath: executablePath(),
+     executablePath: isWindows
+      ? "C:/Program Files/Google/Chrome/Application/chrome.exe"
+      : "/usr/bin/google-chrome",
             // executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe',
 
   },
