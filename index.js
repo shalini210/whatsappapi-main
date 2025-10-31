@@ -28,7 +28,7 @@ const uploadsDir = path.join(__dirname, "uploads");
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir);
 
 // ✅ Session file for WhatsApp (persist login)
-const SESSION_FILE_PATH = path.join(__dirname, "session.json");
+const SESSION_FILE_PATH = path.join("/mnt/data", "session.json");
 let sessionData = fs.existsSync(SESSION_FILE_PATH)
   ? require(SESSION_FILE_PATH)
   : null;
