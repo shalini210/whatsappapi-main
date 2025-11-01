@@ -1,7 +1,7 @@
 // index.js
 const express = require("express");
 const fileUpload = require("express-fileupload");
-const { Client, MessageMedia } = require("whatsapp-web.js");
+const { Client, MessageMedia, LocalAuth } = require("whatsapp-web.js");
 const qrcode = require("qrcode");
 const XLSX = require("xlsx");
 const http = require("http");
@@ -27,12 +27,6 @@ app.use(express.static("public")); // serve index.html & static files
 const uploadsDir = path.join(__dirname, "uploads");
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir);
 
-// ✅ Session file for WhatsApp (persist login)
-const SESSION_FILE_PATH = path.join("/mnt/data", "session.json");
-let sessionData = fs.existsSync(SESSION_FILE_PATH)
-  ? require(SESSION_FILE_PATH)
-  : null;
-
 // ✅ Helper: sleep/delay
 const delay = (ms) => new Promise((res) => setTimeout(res, ms));
 
@@ -43,33 +37,51 @@ async function startWhatsApp() {
     ? "C:/Program Files/Google/Chrome/Application/chrome.exe"
     : await chromium.executablePath(); // call the function!
 
-  const client = new Client({
-    puppeteer: {
-      headless: true,
-      executablePath,
-      args: [
-        ...chromium.args,
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-      ],
-      defaultViewport: chromium.defaultViewport,
-    },
-    session: sessionData, // persistent session
-    webVersionCache: { type: "none" },
-  });
+  // const client = new Client({
+  //   authStrategy: new LocalAuth({
+  //     clientId: "whatsapp-session",
+  //     dataPath: "/mnt/data", // ✅ Render-compatible (persistent)
+  //   }),
+  //   puppeteer: {
+  //     headless: true,
+  //     executablePath,
+  //     args: [
+  //       ...chromium.args,
+  //       "--no-sandbox",
+  //       "--disable-setuid-sandbox",
+  //       "--disable-dev-shm-usage",
+  //     ],
+  //     defaultViewport: chromium.defaultViewport,
+  //   },
+  //   webVersionCache: { type: "remote" }, // ✅ Prevent QR loop
+  // });
+const client = new Client({
+  authStrategy: new LocalAuth({
+    clientId: "whatsapp-session",
+    dataPath: "/mnt/data",
+  }),
+  puppeteer: {
+    headless: true,
+    executablePath,
+    args: [
+      ...chromium.args,
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-dev-shm-usage",
+    ],
+    defaultViewport: chromium.defaultViewport,
+  },
+  webVersionCache: {
+    type: "remote",
+    remotePath: "https://raw.githubusercontent.com/pedroslopez/whatsapp-web.js/main/src/webCache/web.json",
+  },
+});
 
   // ✅ Emit QR code to frontend
   client.on("qr", async (qr) => {
     console.log("📲 Scan this QR code");
     const qrImageUrl = await qrcode.toDataURL(qr);
     io.emit("qr", qrImageUrl);
-  });
-
-  // ✅ Save session after authentication
-  client.on("authenticated", (session) => {
-    console.log("🔒 WhatsApp authenticated!");
-    fs.writeFileSync(SESSION_FILE_PATH, JSON.stringify(session));
   });
 
   // ✅ Ready
@@ -81,7 +93,6 @@ async function startWhatsApp() {
   // ✅ Auth failure
   client.on("auth_failure", (msg) => {
     console.log("❌ Auth failure:", msg);
-    if (fs.existsSync(SESSION_FILE_PATH)) fs.unlinkSync(SESSION_FILE_PATH);
   });
 
   // ✅ Disconnected → reconnect
@@ -94,7 +105,9 @@ async function startWhatsApp() {
   app.post("/send", async (req, res) => {
     try {
       if (!client.info || !client.info.wid) {
-        return res.status(400).json({ error: "WhatsApp not ready. Please scan QR." });
+        return res
+          .status(400)
+          .json({ error: "WhatsApp not ready. Please scan QR." });
       }
 
       let numbers = [];
@@ -134,7 +147,9 @@ async function startWhatsApp() {
       }
 
       const msgDelay = Math.max(parseInt(req.body.delay) || 2000, 1500);
-      let sentCount = 0, skippedCount = 0, failedCount = 0;
+      let sentCount = 0,
+        skippedCount = 0,
+        failedCount = 0;
 
       (async () => {
         const total = numbers.length;
@@ -152,8 +167,14 @@ async function startWhatsApp() {
 
             // ✅ Media
             if (mediaFile) {
-              if (!mediaFile.mimetype.startsWith("video/") && !mediaFile.mimetype.startsWith("image/")) {
-                io.emit("status", `⚠️ Skipped ${number} (invalid file type)`);
+              if (
+                !mediaFile.mimetype.startsWith("video/") &&
+                !mediaFile.mimetype.startsWith("image/")
+              ) {
+                io.emit(
+                  "status",
+                  `⚠️ Skipped ${number} (invalid file type)`
+                );
                 skippedCount++;
                 continue;
               }
@@ -166,8 +187,14 @@ async function startWhatsApp() {
 
               const uploadPath = path.join(uploadsDir, mediaFile.name);
               await mediaFile.mv(uploadPath);
-              const base64 = fs.readFileSync(uploadPath, { encoding: "base64" });
-              const media = new MessageMedia(mediaFile.mimetype, base64, mediaFile.name);
+              const base64 = fs.readFileSync(uploadPath, {
+                encoding: "base64",
+              });
+              const media = new MessageMedia(
+                mediaFile.mimetype,
+                base64,
+                mediaFile.name
+              );
               await client.sendMessage(chatId, media, { caption: message });
               fs.unlinkSync(uploadPath);
             } else {
@@ -179,7 +206,10 @@ async function startWhatsApp() {
           } catch (err) {
             console.error("❌ Send error:", err.message);
             failedCount++;
-            io.emit("status", `❌ (${i + 1}/${total}) Failed to send to ${number}`);
+            io.emit(
+              "status",
+              `❌ (${i + 1}/${total}) Failed to send to ${number}`
+            );
           }
 
           await delay(msgDelay);
